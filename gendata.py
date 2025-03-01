@@ -27,7 +27,7 @@ def generate_reasoning_trace_with_activations(prompt, model, tokenizer):
         return_dict_in_generate=True,
         temperature=0.6,
         top_p=0.95,
-        max_length=32768,
+        max_length=512,
     )
     generated_ids = outputs.sequences
     decoded_output = tokenizer.decode(
@@ -68,11 +68,13 @@ if __name__ == "__main__":
     os.makedirs(
         output_dir, exist_ok=True
     )  # creates the directory if it does not exist.
-    results = [
-        generate_reasoning_trace_with_activations(p, model, tokenizer) for p in tqdm(prompts, desc="Generating traces")
-    ]
+    results = []
+    for i, p in enumerate(tqdm(prompts, desc="Generating traces")):
+        decoded_output, hidden_states = generate_reasoning_trace_with_activations(
+            p, model, tokenizer
+        )
+        print(decoded_output)
 
-    for i, (decoded_output, hidden_states) in enumerate(results):
         output_file = os.path.join(output_dir, f"trace_{i}.pt")
         torch.save(
             {

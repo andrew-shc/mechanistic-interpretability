@@ -21,14 +21,14 @@ def get_probe_logits(inputs, subject, probe):
 
 def train_language_probe(
     dataloader,
+    probe,
     teacher: nn.Module,
-    embed_dim,
-    vocab_size,
+    tokenizer,
     epochs,
     log_dir,
 ):
     device = next(teacher.parameters()).device
-    probe = nn.Linear(embed_dim, vocab_size, device=device)
+    probe = probe.to(device)
     writer = SummaryWriter(log_dir)
 
     freeze_model(teacher)
@@ -43,10 +43,15 @@ def train_language_probe(
 
     for epoch in range(epochs):
         epoch_loss = 0.0
-        for i, (inputs, activations) in enumerate(tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")):
-            logits = probe(activations)
+        for i, (inputs, activations) in enumerate(
+            tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")
+        ):
+            logits = probe(activations.to(device))
             token_embeds = logits @ teacher.model.embed_tokens.weight
-            teacher_outputs = teacher(inputs_embed=token_embeds)
+            # import pdb; pdb.set_trace()
+            # print(token_embeds.shape)
+            teacher_outputs = teacher(inputs_embeds=token_embeds)
+            # print(teacher_outputs)
             teacher_logits = teacher_outputs.logits
 
             loss = nn.functional.cross_entropy(logits, teacher_logits.softmax(-1))
@@ -64,16 +69,36 @@ def train_language_probe(
         input, activation = next(iter(dataloader))
         logits = probe(activation)
         tokens = logits.argmax(dim=-1)
+        text = tokenizer.decode(tokens[0])
+
         input_str = f"Input: {input}\n"
-        probe_str = f"Probe: {tokens}\n"
+        probe_str = f"Probe: {text}\n"
+        loss_str = f"Loss: {avg_loss}\n"
 
         print(input_str)
         print(probe_str)
+        print(loss_str)
         logger.info(input_str)
         logger.info(probe_str)
+        logger.info(loss_str)
 
         # Log input and probe to tensorboard
         writer.add_text("Input", input_str, epoch)
         writer.add_text("Probe", probe_str, epoch)
 
     writer.close()
+    torch.save(probe.state_dict(), f"{log_dir}/probe_state_dict.pth")
+    return probe
+
+def train_linear_language_probe(
+    dataloader,
+    teacher: nn.Module,
+    tokenizer,
+    embed_dim,
+    vocab_size,
+    epochs,
+    log_dir,
+):
+    device = next(teacher.parameters()).device
+    probe = nn.Linear(embed_dim, vocab_size, device=device).to(device)
+    return train_language_probe(dataloader, probe, teacher, tokenizer, embed_dim, vocab_size, epochs, log_dir)

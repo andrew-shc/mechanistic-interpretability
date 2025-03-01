@@ -1,20 +1,21 @@
-class CustomImageDataset(Dataset):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-        self.img_labels = pd.read_csv(annotations_file)
-        self.img_dir = img_dir
-        self.transform = transform
-        self.target_transform = target_transform
+from pathlib import Path
+import torch
+from torch.utils.data import Dataset
+import os
+
+
+class HiddenStateDataset(Dataset):
+    def __init__(self, layer: int, path: Path):
+        self.hidden_states = []
+        self.layer = layer
+
+        for files in os.listdir(path):
+            self.hidden_states.append(torch.load(path+"/"+files))
+        # self.hidden_states = [(k, hidden_states[k]) for k in hidden_states]
 
     def __len__(self):
-        return len(self.img_labels)
+        return len(self.hidden_states)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = read_image(img_path)
-        label = self.img_labels.iloc[idx, 1]
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
-        return image, label
+        return self.hidden_states[idx]["decoded_output"], self.hidden_states[idx]["hidden_states"][self.layer].to(0)
 
