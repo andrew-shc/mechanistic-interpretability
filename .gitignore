@@ -171,4 +171,5 @@ cython_debug/
 .pypirc
 
 data/*
-log/*
+log/event*
+log/*.pth

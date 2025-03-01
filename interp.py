@@ -3,6 +3,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import logging
+import torch.nn.functional as F
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -47,10 +48,10 @@ def train_language_probe(
             tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")
         ):
             logits = probe(activations.to(device))
-            token_embeds = logits @ teacher.model.embed_tokens.weight
+            indices = logits.argmax(dim=-1)
             # import pdb; pdb.set_trace()
             # print(token_embeds.shape)
-            teacher_outputs = teacher(inputs_embeds=token_embeds)
+            teacher_outputs = teacher(input_ids=indices)
             # print(teacher_outputs)
             teacher_logits = teacher_outputs.logits
 
@@ -99,6 +100,5 @@ def train_linear_language_probe(
     epochs,
     log_dir,
 ):
-    device = next(teacher.parameters()).device
-    probe = nn.Linear(embed_dim, vocab_size, device=device).to(device)
-    return train_language_probe(dataloader, probe, teacher, tokenizer, embed_dim, vocab_size, epochs, log_dir)
+    probe = nn.Linear(embed_dim, vocab_size)
+    return train_language_probe(dataloader, probe, teacher, tokenizer, epochs, log_dir)
